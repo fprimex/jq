@@ -22,7 +22,6 @@ export CC_FOR_BUILD="clang -isysroot ${OSX_SDKROOT}"
 export CFLAGS="-arch arm64 -miphoneos-version-min=14.0 -isysroot ${IOS_SDKROOT} -fembed-bitcode -Dstat64=stat -Dlstat64=lstat -Dfstat64=fstat -DUSE_GLIBC_STDIO=1 -I${PWD}"
 export CPPFLAGS="-arch arm64 -miphoneos-version-min=14.0 -isysroot ${IOS_SDKROOT} -fembed-bitcode -Dstat64=stat -Dlstat64=lstat -Dfstat64=fstat -DUSE_GLIBC_STDIO=1 -I${PWD}"
 export CXXFLAGS="-arch arm64 -miphoneos-version-min=14.0 -isysroot ${IOS_SDKROOT} -fembed-bitcode -Dstat64=stat -Dlstat64=lstat -Dfstat64=fstat -DUSE_GLIBC_STDIO=1 -I${PWD}"
-#export LDFLAGS="-arch arm64 -miphoneos-version-min=14.0 -isysroot ${IOS_SDKROOT} -fembed-bitcode -dynamiclib -F ${PWD}/ios_system.xcframework/ios-arm64 -framework ios_system"
 export LDFLAGS="-arch arm64 -miphoneos-version-min=14.0 -isysroot ${IOS_SDKROOT} -fembed-bitcode -dynamiclib -F ${PWD}/ios_system.xcframework/ios-arm64 -framework ios_system"
 
 #./configure --build=x86_64-apple-darwin --host=arm64-apple-darwin cross_compiling=yes \
@@ -30,9 +29,6 @@ export LDFLAGS="-arch arm64 -miphoneos-version-min=14.0 -isysroot ${IOS_SDKROOT}
 
 make -j4 --quiet
 #make check
-
-echo "finished first build"
-exit 0
 
 mkdir -p ios_system.xcframework/ios-arm64
 
