@@ -18,21 +18,14 @@
 extern void jv_tsd_dtoa_ctx_init();
 #endif
 
-#if !defined(HAVE_ISATTY) && defined(HAVE__ISATTY)
-#undef isatty
-#define isatty _isatty
-#endif
-
-#if defined(HAVE_ISATTY) || defined(HAVE__ISATTY)
-#define USE_ISATTY
-#endif
-
 #include "compile.h"
 #include "jv.h"
 #include "jq.h"
 #include "jv_alloc.h"
 #include "util.h"
 #include "src/version.h"
+
+#include "ios_error.h"
 
 int jq_testsuite(jv lib_dirs, int verbose, int argc, char* argv[]);
 
@@ -43,10 +36,10 @@ static const char* progname;
  * strategy, one that lets stack options.
  */
 static void usage(int code, int keep_it_short) {
-  FILE *f = stderr;
+  FILE *f = thread_stderr;
 
   if (code == 0)
-    f = stdout;
+    f = thread_stdout;
 
   int ret = fprintf(f,
     "jq - commandline JSON processor [version %s]\n"
@@ -92,13 +85,13 @@ static void usage(int code, int keep_it_short) {
       "positional arguments are available as $ARGS.positional[].\n"
       "\nSee the manpage for more options.\n");
   }
-  exit((ret < 0 && code == 0) ? 2 : code);
+  ios_exit((ret < 0 && code == 0) ? 2 : code);
 }
 
 static void die() {
-  fprintf(stderr, "Use %s --help for help with command-line options,\n", progname);
-  fprintf(stderr, "or see the jq manpage, or online docs  at https://stedolan.github.io/jq\n");
-  exit(2);
+  fprintf(thread_stderr, "Use %s --help for help with command-line options,\n", progname);
+  fprintf(thread_stderr, "or see the jq manpage, or online docs  at https://stedolan.github.io/jq\n");
+  ios_exit(2);
 }
 
 
@@ -175,15 +168,15 @@ static const char *skip_shebang(const char *p) {
 }
 
 static int process(jq_state *jq, jv value, int flags, int dumpopts) {
-  int ret = JQ_OK_NO_OUTPUT; // No valid results && -e -> exit(4)
+  int ret = JQ_OK_NO_OUTPUT; // No valid results && -e -> ios_exit(4)
   jq_start(jq, value, flags);
   jv result;
   while (jv_is_valid(result = jq_next(jq))) {
     if ((options & RAW_OUTPUT) && jv_get_kind(result) == JV_KIND_STRING) {
       if (options & ASCII_OUTPUT) {
-        jv_dumpf(jv_copy(result), stdout, JV_PRINT_ASCII);
+        jv_dumpf(jv_copy(result), thread_stdout, JV_PRINT_ASCII);
       } else {
-        fwrite(jv_string_value(result), 1, jv_string_length_bytes(jv_copy(result)), stdout);
+        ios_fwrite(jv_string_value(result), 1, jv_string_length_bytes(jv_copy(result)), thread_stdout);
       }
       ret = JQ_OK;
       jv_free(result);
@@ -193,15 +186,15 @@ static int process(jq_state *jq, jv value, int flags, int dumpopts) {
       else
         ret = JQ_OK;
       if (options & SEQ)
-        priv_fwrite("\036", 1, stdout, dumpopts & JV_PRINT_ISATTY);
+        priv_fwrite("\036", 1, thread_stdout, dumpopts & JV_PRINT_ISATTY);
       jv_dump(result, dumpopts);
     }
     if (!(options & RAW_NO_LF))
-      priv_fwrite("\n", 1, stdout, dumpopts & JV_PRINT_ISATTY);
+      priv_fwrite("\n", 1, thread_stdout, dumpopts & JV_PRINT_ISATTY);
     if (options & RAW_NUL)
-      priv_fwrite("\0", 1, stdout, dumpopts & JV_PRINT_ISATTY);
+      priv_fwrite("\0", 1, thread_stdout, dumpopts & JV_PRINT_ISATTY);
     if (options & UNBUFFERED_OUTPUT)
-      fflush(stdout);
+      ios_fflush(thread_stdout);
   }
   if (jq_halted(jq)) {
     // jq program invoked `halt` or `halt_error`
@@ -216,25 +209,25 @@ static int process(jq_state *jq, jv value, int flags, int dumpopts) {
     jv_free(exit_code);
     jv error_message = jq_get_error_message(jq);
     if (jv_get_kind(error_message) == JV_KIND_STRING) {
-      fprintf(stderr, "jq: error: %s", jv_string_value(error_message));
+      fprintf(thread_stderr, "jq: error: %s", jv_string_value(error_message));
     } else if (jv_get_kind(error_message) == JV_KIND_NULL) {
       // Halt with no output
     } else if (jv_is_valid(error_message)) {
       error_message = jv_dump_string(jv_copy(error_message), 0);
-      fprintf(stderr, "jq: error: %s\n", jv_string_value(error_message));
+      fprintf(thread_stderr, "jq: error: %s\n", jv_string_value(error_message));
     } // else no message on stderr; use --debug-trace to see a message
-    fflush(stderr);
+    ios_fflush(thread_stderr);
     jv_free(error_message);
   } else if (jv_invalid_has_msg(jv_copy(result))) {
     // Uncaught jq exception
     jv msg = jv_invalid_get_msg(jv_copy(result));
     jv input_pos = jq_util_input_get_position(jq);
     if (jv_get_kind(msg) == JV_KIND_STRING) {
-      fprintf(stderr, "jq: error (at %s): %s\n",
+      fprintf(thread_stderr, "jq: error (at %s): %s\n",
               jv_string_value(input_pos), jv_string_value(msg));
     } else {
       msg = jv_dump_string(msg, 0);
-      fprintf(stderr, "jq: error (at %s) (not a string): %s\n",
+      fprintf(thread_stderr, "jq: error (at %s) (not a string): %s\n",
               jv_string_value(input_pos), jv_string_value(msg));
     }
     ret = JQ_ERROR_UNKNOWN;
@@ -247,8 +240,8 @@ static int process(jq_state *jq, jv value, int flags, int dumpopts) {
 
 static void debug_cb(void *data, jv input) {
   int dumpopts = *(int *)data;
-  jv_dumpf(JV_ARRAY(jv_string("DEBUG:"), input), stderr, dumpopts & ~(JV_PRINT_PRETTY));
-  fprintf(stderr, "\n");
+  jv_dumpf(JV_ARRAY(jv_string("DEBUG:"), input), thread_stderr, dumpopts & ~(JV_PRINT_PRETTY));
+  fprintf(thread_stderr, "\n");
 }
 
 #ifdef WIN32
@@ -283,10 +276,10 @@ int main(int argc, char* argv[]) {
 
 #ifdef WIN32
   jv_tsd_dtoa_ctx_init();
-  fflush(stdout);
-  fflush(stderr);
-  _setmode(fileno(stdout), _O_TEXT | _O_U8TEXT);
-  _setmode(fileno(stderr), _O_TEXT | _O_U8TEXT);
+  ios_fflush(thread_stdout);
+  ios_fflush(thread_stderr);
+  _setmode(fileno(thread_stdout), _O_TEXT | _O_U8TEXT);
+  _setmode(fileno(thread_stderr), _O_TEXT | _O_U8TEXT);
 #endif
 
   if (argc) progname = argv[0];
@@ -342,7 +335,7 @@ int main(int argc, char* argv[]) {
         if (argv[i][2] != 0) { // -Lname (faster check than strlen)
             lib_search_paths = jv_array_append(lib_search_paths, jq_realpath(jv_string(argv[i]+2)));
         } else if (i >= argc - 1) {
-          fprintf(stderr, "-L takes a parameter: (e.g. -L /search/path or -L/search/path)\n");
+          fprintf(thread_stderr, "-L takes a parameter: (e.g. -L /search/path or -L/search/path)\n");
           die();
         } else {
           lib_search_paths = jv_array_append(lib_search_paths, jq_realpath(jv_string(argv[i+1])));
@@ -405,11 +398,11 @@ int main(int argc, char* argv[]) {
       }
       if (isoption(argv[i], 'b', "binary", &short_opts)) {
 #ifdef WIN32
-        fflush(stdout);
-        fflush(stderr);
-        _setmode(fileno(stdin),  _O_BINARY);
-        _setmode(fileno(stdout), _O_BINARY);
-        _setmode(fileno(stderr), _O_BINARY);
+        ios_fflush(thread_stdout);
+        ios_fflush(thread_stderr);
+        _setmode(fileno(thread_stdin),  _O_BINARY);
+        _setmode(fileno(thread_stdout), _O_BINARY);
+        _setmode(fileno(thread_stderr), _O_BINARY);
         if (!short_opts) continue;
 #endif
       }
@@ -420,13 +413,13 @@ int main(int argc, char* argv[]) {
       }
       if (isoption(argv[i], 0, "indent", &short_opts)) {
         if (i >= argc - 1) {
-          fprintf(stderr, "%s: --indent takes one parameter\n", progname);
+          fprintf(thread_stderr, "%s: --indent takes one parameter\n", progname);
           die();
         }
         dumpopts &= ~(JV_PRINT_TAB | JV_PRINT_INDENT_FLAGS(7));
         int indent = atoi(argv[i+1]);
         if (indent < -1 || indent > 7) {
-          fprintf(stderr, "%s: --indent takes a number between -1 and 7\n", progname);
+          fprintf(thread_stderr, "%s: --indent takes a number between -1 and 7\n", progname);
           die();
         }
         dumpopts |= JV_PRINT_INDENT_FLAGS(indent);
@@ -462,7 +455,7 @@ int main(int argc, char* argv[]) {
       }
       if (isoption(argv[i], 0, "arg", &short_opts)) {
         if (i >= argc - 2) {
-          fprintf(stderr, "%s: --arg takes two parameters (e.g. --arg varname value)\n", progname);
+          fprintf(thread_stderr, "%s: --arg takes two parameters (e.g. --arg varname value)\n", progname);
           die();
         }
         if (!jv_object_has(jv_copy(program_arguments), jv_string(argv[i+1])))
@@ -472,13 +465,13 @@ int main(int argc, char* argv[]) {
       }
       if (isoption(argv[i], 0, "argjson", &short_opts)) {
         if (i >= argc - 2) {
-          fprintf(stderr, "%s: --argjson takes two parameters (e.g. --argjson varname text)\n", progname);
+          fprintf(thread_stderr, "%s: --argjson takes two parameters (e.g. --argjson varname text)\n", progname);
           die();
         }
         if (!jv_object_has(jv_copy(program_arguments), jv_string(argv[i+1]))) {
           jv v = jv_parse(argv[i+2]);
           if (!jv_is_valid(v)) {
-            fprintf(stderr, "%s: invalid JSON text passed to --argjson\n", progname);
+            fprintf(thread_stderr, "%s: invalid JSON text passed to --argjson\n", progname);
             die();
           }
           program_arguments = jv_object_set(program_arguments, jv_string(argv[i+1]), v);
@@ -498,14 +491,14 @@ int main(int argc, char* argv[]) {
         else
           which = "slurpfile";
         if (i >= argc - 2) {
-          fprintf(stderr, "%s: --%s takes two parameters (e.g. --%s varname filename)\n", progname, which, which);
+          fprintf(thread_stderr, "%s: --%s takes two parameters (e.g. --%s varname filename)\n", progname, which, which);
           die();
         }
         if (!jv_object_has(jv_copy(program_arguments), jv_string(argv[i+1]))) {
           jv data = jv_load_file(argv[i+2], raw);
           if (!jv_is_valid(data)) {
             data = jv_invalid_get_msg(data);
-            fprintf(stderr, "%s: Bad JSON in --%s %s %s: %s\n", progname, which,
+            fprintf(thread_stderr, "%s: Bad JSON in --%s %s %s: %s\n", progname, which,
                     argv[i+1], argv[i+2], jv_string_value(data));
             jv_free(data);
             ret = JQ_ERROR_SYSTEM;
@@ -552,14 +545,14 @@ int main(int argc, char* argv[]) {
 
       // check for unknown options... if this argument was a short option
       if (strlen(argv[i]) != short_opts + 1) {
-        fprintf(stderr, "%s: Unknown option %s\n", progname, argv[i]);
+        fprintf(thread_stderr, "%s: Unknown option %s\n", progname, argv[i]);
         die();
       }
     }
   }
 
 #ifdef USE_ISATTY
-  if (isatty(STDOUT_FILENO)) {
+  if (ios_isatty(STDOUT_FILENO)) {
 #ifndef WIN32
     dumpopts |= JV_PRINT_ISATTY | JV_PRINT_COLOR;
 #else
@@ -570,7 +563,7 @@ int main(int argc, char* argv[]) {
     HANDLE con = GetStdHandle(STD_OUTPUT_HANDLE);
     if (GetConsoleMode(con, &mode)) {
       dumpopts |= JV_PRINT_ISATTY;
-      if (getenv("ANSICON") != NULL ||
+      if (ios_getenv("ANSICON") != NULL ||
           SetConsoleMode(con, mode | 4/*ENABLE_VIRTUAL_TERMINAL_PROCESSING*/))
         dumpopts |= JV_PRINT_COLOR;
     }
@@ -582,8 +575,8 @@ int main(int argc, char* argv[]) {
   if (options & COLOR_OUTPUT) dumpopts |= JV_PRINT_COLOR;
   if (options & NO_COLOR_OUTPUT) dumpopts &= ~JV_PRINT_COLOR;
 
-  if (getenv("JQ_COLORS") != NULL && !jq_set_colors(getenv("JQ_COLORS")))
-      fprintf(stderr, "Failed to set $JQ_COLORS\n");
+  if (ios_getenv("JQ_COLORS") != NULL && !jq_set_colors(ios_getenv("JQ_COLORS")))
+      fprintf(thread_stderr, "Failed to set $JQ_COLORS\n");
 
   if (jv_get_kind(lib_search_paths) == JV_KIND_NULL) {
     // Default search path list
@@ -595,8 +588,8 @@ int main(int argc, char* argv[]) {
 
   char *origin = strdup(argv[0]);
   if (origin == NULL) {
-    fprintf(stderr, "jq: error: out of memory\n");
-    exit(1);
+    fprintf(thread_stderr, "jq: error: out of memory\n");
+    ios_exit(1);
   }
   jq_set_attr(jq, jv_string("JQ_ORIGIN"), jv_string(dirname(origin)));
   free(origin);
@@ -607,7 +600,7 @@ int main(int argc, char* argv[]) {
     jq_set_attr(jq, jv_string("VERSION_DIR"), jv_string_fmt("%.*s-master", (int)(strchr(JQ_VERSION, '-') - JQ_VERSION), JQ_VERSION));
 
 #ifdef USE_ISATTY
-  if (!program && (!isatty(STDOUT_FILENO) || !isatty(STDIN_FILENO)))
+  if (!program && (!ios_isatty(STDOUT_FILENO) || !ios_isatty(STDIN_FILENO)))
     program = ".";
 #endif
 
@@ -617,13 +610,13 @@ int main(int argc, char* argv[]) {
     char *program_origin = strdup(program);
     if (program_origin == NULL) {
       perror("malloc");
-      exit(2);
+      ios_exit(2);
     }
 
     jv data = jv_load_file(program, 1);
     if (!jv_is_valid(data)) {
       data = jv_invalid_get_msg(data);
-      fprintf(stderr, "%s: %s\n", progname, jv_string_value(data));
+      fprintf(thread_stderr, "%s: %s\n", progname, jv_string_value(data));
       jv_free(data);
       ret = JQ_ERROR_SYSTEM;
       goto out;
@@ -687,11 +680,11 @@ int main(int argc, char* argv[]) {
       if (!(options & SEQ)) {
         // --seq -> errors are not fatal
         ret = JQ_OK_NO_OUTPUT;
-        fprintf(stderr, "jq: parse error: %s\n", jv_string_value(msg));
+        fprintf(thread_stderr, "jq: parse error: %s\n", jv_string_value(msg));
         jv_free(msg);
         break;
       }
-      fprintf(stderr, "jq: ignoring parse error: %s\n", jv_string_value(msg));
+      fprintf(thread_stderr, "jq: ignoring parse error: %s\n", jv_string_value(msg));
       jv_free(msg);
     }
   }
@@ -700,9 +693,9 @@ int main(int argc, char* argv[]) {
     ret = JQ_ERROR_SYSTEM;
 
 out:
-  badwrite = ferror(stdout);
-  if (fclose(stdout)!=0 || badwrite) {
-    fprintf(stderr,"jq: error: writing output failed: %s\n", strerror(errno));
+  badwrite = ferror(thread_stdout);
+  if (fclose(thread_stdout)!=0 || badwrite) {
+    fprintf(thread_stderr,"jq: error: writing output failed: %s\n", strerror(errno));
     ret = JQ_ERROR_SYSTEM;
   }
 

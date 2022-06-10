@@ -3,6 +3,8 @@
 #include <string.h>
 #include "jv_alloc.h"
 
+#include "ios_error.h"
+
 struct nomem_handler {
     jv_nomem_handler_f handler;
     void *data;
@@ -37,7 +39,7 @@ static void memory_exhausted() {
   if (nomem_handler.handler)
     nomem_handler.handler(nomem_handler.data); // Maybe handler() will longjmp() to safety
   // Or not
-  fprintf(stderr, "jq: error: cannot allocate memory\n");
+  fprintf(thread_stderr, "jq: error: cannot allocate memory\n");
   abort();
 }
 #else /* USE_TLS */
@@ -59,16 +61,16 @@ static void tsd_fini(void) {
 
 static void tsd_init(void) {
   if (pthread_key_create(&nomem_handler_key, NULL) != 0) {
-    fprintf(stderr, "jq: error: cannot create thread specific key");
+    fprintf(thread_stderr, "jq: error: cannot create thread specific key");
     abort();
   }
   if (atexit(tsd_fini) != 0) {
-    fprintf(stderr, "jq: error: cannot set an exit handler");
+    fprintf(thread_stderr, "jq: error: cannot set an exit handler");
     abort();
   }
   struct nomem_handler *nomem_handler = calloc(1, sizeof(struct nomem_handler));
   if (pthread_setspecific(nomem_handler_key, nomem_handler) != 0) {
-    fprintf(stderr, "jq: error: cannot set thread specific data");
+    fprintf(thread_stderr, "jq: error: cannot set thread specific data");
     abort();
   }
 }
@@ -80,7 +82,7 @@ void jv_nomem_handler(jv_nomem_handler_f handler, void *data) {
   nomem_handler = pthread_getspecific(nomem_handler_key);
   if (nomem_handler == NULL) {
     handler(data);
-    fprintf(stderr, "jq: error: cannot allocate memory\n");
+    fprintf(thread_stderr, "jq: error: cannot allocate memory\n");
     abort();
   }
   nomem_handler->handler = handler;
@@ -95,7 +97,7 @@ static void memory_exhausted() {
   if (nomem_handler)
     nomem_handler->handler(nomem_handler->data); // Maybe handler() will longjmp() to safety
   // Or not
-  fprintf(stderr, "jq: error: cannot allocate memory\n");
+  fprintf(thread_stderr, "jq: error: cannot allocate memory\n");
   abort();
 }
 
@@ -110,7 +112,7 @@ void jv_nomem_handler(jv_nomem_handler_f handler, void *data) {
 }
 
 static void memory_exhausted() {
-  fprintf(stderr, "jq: error: cannot allocate memory\n");
+  fprintf(thread_stderr, "jq: error: cannot allocate memory\n");
   abort();
 }
 

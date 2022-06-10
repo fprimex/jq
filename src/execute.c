@@ -19,6 +19,8 @@
 #include "util.h"
 #include "linker.h"
 
+#include "ios_error.h"
+
 struct jq_state {
   void (*nomem_handler)(void *);
   void *nomem_handler_data;
@@ -955,7 +957,7 @@ jv jq_format_error(jv msg) {
   if (jv_get_kind(msg) == JV_KIND_NULL ||
       (jv_get_kind(msg) == JV_KIND_INVALID && !jv_invalid_has_msg(jv_copy(msg)))) {
     jv_free(msg);
-    fprintf(stderr, "jq: error: out of memory\n");
+    fprintf(thread_stderr, "jq: error: out of memory\n");
     return jv_null();
   }
 
@@ -1013,7 +1015,7 @@ jq_state *jq_init(void) {
   jq->error_message = jv_invalid();
 
   jq->err_cb = default_err_cb;
-  jq->err_cb_data = stderr;
+  jq->err_cb_data = thread_stderr;
 
   jq->attrs = jv_object();
   jq->path = jv_null();
@@ -1027,7 +1029,7 @@ jq_state *jq_init(void) {
 void jq_set_error_cb(jq_state *jq, jq_msg_cb cb, void *data) {
   if (cb == NULL) {
     jq->err_cb = default_err_cb;
-    jq->err_cb_data = stderr;
+    jq->err_cb_data = thread_stderr;
   } else {
     jq->err_cb = cb;
     jq->err_cb_data = data;

@@ -256,6 +256,8 @@
 #include <errno.h>
 #include <stdlib.h>
 
+#include "ios_error.h"
+
 /* end standard C headers. */
 
 /* flex integer type definitions */
@@ -1086,10 +1088,10 @@ YY_DECL
 			yyg->yy_start = 1;	/* first start state */
 
 		if ( ! yyin )
-			yyin = stdin;
+			yyin = thread_stdin;
 
 		if ( ! yyout )
-			yyout = stdout;
+			yyout = thread_stdout;
 
 		if ( ! YY_CURRENT_BUFFER ) {
 			yyensure_buffer_stack (yyscanner);
@@ -2003,7 +2005,7 @@ static void yy_load_buffer_state  (yyscan_t yyscanner)
         b->yy_bs_column = 0;
     }
 
-        b->yy_is_interactive = file ? (isatty( fileno(file) ) > 0) : 0;
+        b->yy_is_interactive = file ? (ios_isatty( fileno(file) ) > 0) : 0;
     
 	errno = oerrno;
 }
@@ -2272,7 +2274,7 @@ static void yynoreturn yy_fatal_error (const char* msg , yyscan_t yyscanner)
 {
 	struct yyguts_t * yyg = (struct yyguts_t*)yyscanner;
 	(void)yyg;
-	fprintf( stderr, "%s\n", msg );
+	fprintf(thread_stderr, "%s\n", msg );
 	exit( YY_EXIT_FAILURE );
 }
 
@@ -2543,8 +2545,8 @@ static int yy_init_globals (yyscan_t yyscanner)
 
 /* Defined in main.c */
 #ifdef YY_STDINIT
-    yyin = stdin;
-    yyout = stdout;
+    yyin = thread_stdin;
+    yyout = thread_stdout;
 #else
     yyin = NULL;
     yyout = NULL;

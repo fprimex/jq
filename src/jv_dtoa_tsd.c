@@ -6,6 +6,8 @@
 #include "jv_dtoa.h"
 #include "jv_alloc.h"
 
+#include "ios_error.h"
+
 #ifndef WIN32
 static pthread_once_t dtoa_ctx_once = PTHREAD_ONCE_INIT;
 #endif
@@ -32,7 +34,7 @@ static
 #endif
 void jv_tsd_dtoa_ctx_init() {
   if (pthread_key_create(&dtoa_ctx_key, tsd_dtoa_ctx_dtor) != 0) {
-    fprintf(stderr, "error: cannot create thread specific key");
+    fprintf(thread_stderr, "error: cannot create thread specific key");
     abort();
   }
 #ifndef WIN32
@@ -49,7 +51,7 @@ inline struct dtoa_context *tsd_dtoa_context_get() {
     ctx = malloc(sizeof(struct dtoa_context));
     jvp_dtoa_context_init(ctx);
     if (pthread_setspecific(dtoa_ctx_key, ctx) != 0) {
-      fprintf(stderr, "error: cannot set thread specific data");
+      fprintf(thread_stderr, "error: cannot set thread specific data");
       abort();
     }
   }

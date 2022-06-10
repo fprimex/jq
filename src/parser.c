@@ -73,6 +73,8 @@
 #define YYMALLOC jv_mem_alloc
 #define YYFREE jv_mem_free
 
+#include "ios_error.h"
+
 #line 77 "src/parser.c" /* yacc.c:339  */
 
 # ifndef YY_NULLPTR
@@ -1560,10 +1562,10 @@ yy_location_print_ (FILE *yyo, YYLTYPE const * const yylocp)
 do {                                                                      \
   if (yydebug)                                                            \
     {                                                                     \
-      YYFPRINTF (stderr, "%s ", Title);                                   \
-      yy_symbol_print (stderr,                                            \
+      YYFPRINTF (thread_stderr, "%s ", Title);                                   \
+      yy_symbol_print (thread_stderr,                                            \
                   Type, Value, Location, answer, errors, locations, lexer_param_ptr); \
-      YYFPRINTF (stderr, "\n");                                           \
+      YYFPRINTF (thread_stderr, "\n");                                           \
     }                                                                     \
 } while (0)
 
@@ -1616,13 +1618,13 @@ yy_symbol_print (FILE *yyoutput, int yytype, YYSTYPE const * const yyvaluep, YYL
 static void
 yy_stack_print (yytype_int16 *yybottom, yytype_int16 *yytop)
 {
-  YYFPRINTF (stderr, "Stack now");
+  YYFPRINTF (thread_stderr, "Stack now");
   for (; yybottom <= yytop; yybottom++)
     {
       int yybot = *yybottom;
-      YYFPRINTF (stderr, " %d", yybot);
+      YYFPRINTF (thread_stderr, " %d", yybot);
     }
-  YYFPRINTF (stderr, "\n");
+  YYFPRINTF (thread_stderr, "\n");
 }
 
 # define YY_STACK_PRINT(Bottom, Top)                            \
@@ -1642,17 +1644,17 @@ yy_reduce_print (yytype_int16 *yyssp, YYSTYPE *yyvsp, YYLTYPE *yylsp, int yyrule
   unsigned long int yylno = yyrline[yyrule];
   int yynrhs = yyr2[yyrule];
   int yyi;
-  YYFPRINTF (stderr, "Reducing stack by rule %d (line %lu):\n",
+  YYFPRINTF (thread_stderr, "Reducing stack by rule %d (line %lu):\n",
              yyrule - 1, yylno);
   /* The symbols being reduced.  */
   for (yyi = 0; yyi < yynrhs; yyi++)
     {
-      YYFPRINTF (stderr, "   $%d = ", yyi + 1);
-      yy_symbol_print (stderr,
+      YYFPRINTF (thread_stderr, "   $%d = ", yyi + 1);
+      yy_symbol_print (thread_stderr,
                        yystos[yyssp[yyi + 1 - yynrhs]],
                        &(yyvsp[(yyi + 1) - (yynrhs)])
                        , &(yylsp[(yyi + 1) - (yynrhs)])                       , answer, errors, locations, lexer_param_ptr);
-      YYFPRINTF (stderr, "\n");
+      YYFPRINTF (thread_stderr, "\n");
     }
 }
 
@@ -2215,7 +2217,7 @@ YYLTYPE yylloc = yyloc_default;
   yylsp = yyls = yylsa;
   yystacksize = YYINITDEPTH;
 
-  YYDPRINTF ((stderr, "Starting parse\n"));
+  YYDPRINTF ((thread_stderr, "Starting parse\n"));
 
   yystate = 0;
   yyerrstatus = 0;
@@ -2294,14 +2296,14 @@ YYLTYPE yylloc = yyloc_default;
       yyvsp = yyvs + yysize - 1;
       yylsp = yyls + yysize - 1;
 
-      YYDPRINTF ((stderr, "Stack size increased to %lu\n",
+      YYDPRINTF ((thread_stderr, "Stack size increased to %lu\n",
                   (unsigned long int) yystacksize));
 
       if (yyss + yystacksize - 1 <= yyssp)
         YYABORT;
     }
 
-  YYDPRINTF ((stderr, "Entering state %d\n", yystate));
+  YYDPRINTF ((thread_stderr, "Entering state %d\n", yystate));
 
   if (yystate == YYFINAL)
     YYACCEPT;
@@ -2326,14 +2328,14 @@ yybackup:
   /* YYCHAR is either YYEMPTY or YYEOF or a valid lookahead symbol.  */
   if (yychar == YYEMPTY)
     {
-      YYDPRINTF ((stderr, "Reading a token: "));
+      YYDPRINTF ((thread_stderr, "Reading a token: "));
       yychar = yylex (&yylval, &yylloc, answer, errors, locations, lexer_param_ptr);
     }
 
   if (yychar <= YYEOF)
     {
       yychar = yytoken = YYEOF;
-      YYDPRINTF ((stderr, "Now at end of input.\n"));
+      YYDPRINTF ((thread_stderr, "Now at end of input.\n"));
     }
   else
     {

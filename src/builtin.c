@@ -46,6 +46,7 @@ void *alloca (size_t);
 #include "jv_unicode.h"
 #include "jv_alloc.h"
 
+#include "ios_error.h"
 
 static jv type_error(jv bad, const char* msg) {
   char errbuf[15];
@@ -1227,7 +1228,7 @@ static jv f_debug(jq_state *jq, jv input) {
 }
 
 static jv f_stderr(jq_state *jq, jv input) {
-  jv_dumpf(jv_copy(input), stderr, 0);
+  jv_dumpf(jv_copy(input), thread_stderr, 0);
   return input;
 }
 
@@ -1740,7 +1741,7 @@ static const struct cfunction function_list[] = {
   {(cfunction_ptr)f_modulemeta, "modulemeta", 1},
   {(cfunction_ptr)f_input, "input", 1},
   {(cfunction_ptr)f_debug, "debug", 1},
-  {(cfunction_ptr)f_stderr, "stderr", 1},
+  {(cfunction_ptr)f_stderr, "thread_stderr", 1},
   {(cfunction_ptr)f_strptime, "strptime", 2},
   {(cfunction_ptr)f_strftime, "strftime", 2},
   {(cfunction_ptr)f_strflocaltime, "strflocaltime", 2},

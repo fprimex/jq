@@ -45,6 +45,8 @@ void *alloca (size_t);
 #include "jq.h"
 #include "jv_alloc.h"
 
+#include "ios_error.h"
+
 #ifdef WIN32
 FILE *fopen(const char *fname, const char *mode) {
   size_t sz = sizeof(wchar_t) * MultiByteToWideChar(CP_UTF8, 0, fname, -1, NULL, 0);
@@ -206,7 +208,7 @@ static void fprinter(void *data, const char *fname) {
 jq_util_input_state *jq_util_input_init(jq_util_msg_cb err_cb, void *err_cb_data) {
   if (err_cb == NULL) {
     err_cb = fprinter;
-    err_cb_data = stderr;
+    err_cb_data = thread_stderr;
   }
   jq_util_input_state *new_state = jv_mem_calloc(1, sizeof(*new_state));
   new_state->err_cb = err_cb;
@@ -266,11 +268,11 @@ static int jq_util_input_read_more(jq_util_input_state *state) {
       // System-level input error on the stream. It will be closed (below).
       // TODO: report it. Can't use 'state->err_cb()' as it is hard-coded for
       //       'open' related problems.
-      fprintf(stderr,"jq: error: %s\n", strerror(errno));
+      fprintf(thread_stderr,"jq: error: %s\n", strerror(errno));
     }
     if (state->current_input) {
-      if (state->current_input == stdin) {
-        clearerr(stdin); // perhaps we can read again; anyways, we don't fclose(stdin)
+      if (state->current_input == thread_stdin) {
+        clearerr(thread_stdin); // perhaps we can read again; anyways, we don't fclose(thread_stdin)
       } else {
         fclose(state->current_input);
       }
@@ -282,7 +284,7 @@ static int jq_util_input_read_more(jq_util_input_state *state) {
     const char *f = next_file(state);
     if (f != NULL) {
       if (!strcmp(f, "-")) {
-        state->current_input = stdin;
+        state->current_input = thread_stdin;
         state->current_filename = jv_string("<stdin>");
       } else {
         state->current_input = fopen(f, "r");

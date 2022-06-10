@@ -55,6 +55,8 @@
 
 #include "jv_type_private.h"
 
+#include "ios_error.h"
+
 /*
  * Internal refcounting helpers
  */
@@ -512,11 +514,11 @@ void jv_tsd_dec_ctx_fini() {
 
 void jv_tsd_dec_ctx_init() {
   if (pthread_key_create(&dec_ctx_key, jv_mem_free) != 0) {
-    fprintf(stderr, "error: cannot create thread specific key");
+    fprintf(thread_stderr, "error: cannot create thread specific key");
     abort();
   }
   if (pthread_key_create(&dec_ctx_dbl_key, jv_mem_free) != 0) {
-    fprintf(stderr, "error: cannot create thread specific key");
+    fprintf(thread_stderr, "error: cannot create thread specific key");
     abort();
   }
 #ifndef WIN32
@@ -552,7 +554,7 @@ static decContext* tsd_dec_ctx_get(pthread_key_t *key) {
   if (ctx) {
     *ctx = _ctx;
     if (pthread_setspecific(*key, ctx) != 0) {
-      fprintf(stderr, "error: cannot store thread specific data");
+      fprintf(thread_stderr, "error: cannot store thread specific data");
       abort();
     }
   }

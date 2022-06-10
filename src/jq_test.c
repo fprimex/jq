@@ -5,12 +5,14 @@
 #include "jv.h"
 #include "jq.h"
 
+#include "ios_error.h"
+
 static void jv_test();
 static void run_jq_tests(jv, int, FILE *, int, int);
 
 
 int jq_testsuite(jv libdirs, int verbose, int argc, char* argv[]) {
-  FILE *testdata = stdin;
+  FILE *testdata = thread_stdin;
   int skip = -1;
   int take = -1;
   jv_test();

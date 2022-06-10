@@ -16,6 +16,8 @@
 #include "jv_alloc.h"
 #include "jv_type_private.h"
 
+#include "ios_error.h"
+
 #ifndef MAX_PRINT_DEPTH
 #define MAX_PRINT_DEPTH (256)
 #endif
@@ -376,15 +378,15 @@ void jv_dumpf(jv x, FILE *f, int flags) {
 }
 
 void jv_dump(jv x, int flags) {
-  jv_dumpf(x, stdout, flags);
+  jv_dumpf(x, thread_stdout, flags);
 }
 
 /* This one is nice for use in debuggers */
 void jv_show(jv x, int flags) {
   if (flags == -1)
     flags = JV_PRINT_PRETTY | JV_PRINT_COLOR | JV_PRINT_INDENT_FLAGS(2);
-  jv_dumpf(jv_copy(x), stderr, flags | JV_PRINT_INVALID);
-  fflush(stderr);
+  jv_dumpf(jv_copy(x), thread_stderr, flags | JV_PRINT_INVALID);
+  fflush(thread_stderr);
 }
 
 jv jv_dump_string(jv x, int flags) {
