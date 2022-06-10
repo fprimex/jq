@@ -1,0 +1,13 @@
+prefix=/
+exec_prefix=/
+libdir=//lib
+includedir=//include
+datarootdir=//share
+datadir=//share
+
+Name: oniguruma
+Description: Regular expression library
+Version: 6.9.3
+Requires:
+Libs: -L${libdir} -lonig
+Cflags: -I${includedir}
